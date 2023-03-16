@@ -70,6 +70,7 @@ func herd(config *Config) error {
 	}
 
 	var errs *multierror.Error
+	var success int
 	for _, tag := range tags {
 		fmt.Printf("#%s", tag.Name)
 		statuses, err := remote.HashtagTimeline(tag.Name)
@@ -89,11 +90,15 @@ func herd(config *Config) error {
 				fmt.Print("f")
 			} else {
 				hist.Add(tag.Name, status.URI)
+				success += 1
 				fmt.Print(".")
 			}
 		}
 		fmt.Print("\n")
 	}
 
-	return errs.ErrorOrNil()
+	if success == 0 && errs.ErrorOrNil() != nil {
+		return errs.ErrorOrNil()
+	}
+	return nil
 }
