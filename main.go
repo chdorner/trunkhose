@@ -75,7 +75,7 @@ func herd(config *Config) error {
 		fmt.Printf("#%s", tag.Name)
 		statuses, err := remote.HashtagTimeline(tag.Name)
 		if err != nil {
-			errs = multierror.Append(errs, err)
+			errs = multierror.Append(errs, fmt.Errorf("failed to get hashtag timeline for %s, err: %w", tag.Name, err))
 			continue
 		}
 
@@ -86,7 +86,7 @@ func herd(config *Config) error {
 
 			err = home.Search(status.URI, true)
 			if err != nil {
-				errs = multierror.Append(errs, err)
+				errs = multierror.Append(errs, fmt.Errorf("failed to import status %s, err: %w", status.URI, err))
 				fmt.Print("f")
 			} else {
 				hist.Add(tag.Name, status.URI)
