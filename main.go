@@ -66,6 +66,9 @@ func herd(config *Config) error {
 	}
 
 	for _, name := range strings.Split(config.ExtraTags, ",") {
+		if name == "" {
+			continue
+		}
 		tags = append(tags, mastodon.Tag{Name: name})
 	}
 
