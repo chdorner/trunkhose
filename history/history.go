@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	URIsLimit = 5
+	Limit = 250
 )
 
 func NewOrParse(path string) (*History, error) {
@@ -73,10 +73,21 @@ func (h *History) Store() error {
 	}
 	defer f.Close()
 
+	h.Trim()
 	err = json.NewEncoder(f).Encode(h)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to write history: %s", err)
 		return err
 	}
 	return nil
+}
+
+func (h *History) Trim() {
+	for _, tagHist := range h.Tags {
+		length := len(tagHist.URIs)
+		if length <= Limit {
+			continue
+		}
+		tagHist.URIs = tagHist.URIs[length-Limit : len(tagHist.URIs)]
+	}
 }
