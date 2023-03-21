@@ -1,9 +1,13 @@
 package history
 
 type History struct {
-	Tags map[string]*TagHistory `json:"tags"`
+	Homes map[string]*HomeHistory `json:"homes"`
 
 	path string
+}
+
+type HomeHistory struct {
+	Tags map[string]*TagHistory `json:"tags"`
 }
 
 type TagHistory struct {

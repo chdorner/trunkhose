@@ -4,104 +4,40 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 
-	"github.com/chdorner/trunkhose/history"
-	"github.com/chdorner/trunkhose/mastodon"
-	"github.com/hashicorp/go-multierror"
 	flag "github.com/spf13/pflag"
 )
 
 func main() {
-	var config Config
-	flag.StringVar(&config.Home, "home", "", "hostname of the home instance")
-	flag.StringVar(&config.APIKey, "api-key", "", "api key for the home instance")
-	flag.StringVar(&config.Remote, "remote", "", "host of the remote instance")
-	flag.StringVar(&config.History, "history", "", "path to the history file")
-	flag.StringVar(&config.ExtraTags, "extra-tags", "", "extra tags to search")
+	var configPath string
+	var historyPath string
+	flag.StringVarP(&configPath, "config", "c", "", "path to the config file")
+	flag.StringVar(&historyPath, "history", "", "path to the history file")
 	flag.Parse()
 
-	err := config.Valid()
-	if err != nil {
-		fmt.Fprint(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, "see --help for more information.")
+	if configPath == "" {
+		fmt.Fprintln(os.Stderr, "missing path to config file")
 		os.Exit(1)
 	}
 
-	if config.History == "" {
+	if historyPath == "" {
 		wd, err := os.Getwd()
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		config.History = path.Join(wd, "trunkhose-history.json")
+		historyPath = path.Join(wd, "trunkhose-history.json")
 	}
 
-	err = herd(&config)
+	config, err := ParseConfig(configPath)
+	if err != nil {
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	err = process(config, historyPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func herd(config *Config) error {
-	hist, err := history.NewOrParse(config.History)
-	if err != nil {
-		return err
-	}
-	defer hist.Store()
-
-	home, err := mastodon.NewClient(config.Home, config.APIKey)
-	if err != nil {
-		return err
-	}
-	remote, err := mastodon.NewClient(config.Remote, "")
-	if err != nil {
-		return err
-	}
-
-	tags, err := home.FollowedTags()
-	if err != nil {
-		return err
-	}
-
-	for _, name := range strings.Split(config.ExtraTags, ",") {
-		if name == "" {
-			continue
-		}
-		tags = append(tags, mastodon.Tag{Name: name})
-	}
-
-	var errs *multierror.Error
-	var success int
-	for _, tag := range tags {
-		fmt.Printf("#%s", tag.Name)
-		statuses, err := remote.HashtagTimeline(tag.Name)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("failed to get hashtag timeline for %s, err: %w", tag.Name, err))
-			continue
-		}
-
-		for _, status := range statuses {
-			if hist.Contains(tag.Name, status.URI) {
-				continue
-			}
-
-			err = home.Search(status.URI, true)
-			if err != nil {
-				errs = multierror.Append(errs, fmt.Errorf("failed to import status %s, err: %w", status.URI, err))
-				fmt.Print("f")
-			} else {
-				hist.Add(tag.Name, status.URI)
-				success += 1
-				fmt.Print(".")
-			}
-		}
-		fmt.Print("\n")
-	}
-
-	if success == 0 && errs.ErrorOrNil() != nil {
-		return errs.ErrorOrNil()
-	}
-	return nil
 }

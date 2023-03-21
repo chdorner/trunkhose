@@ -22,8 +22,8 @@ func NewOrParse(path string) (*History, error) {
 
 func New(path string) *History {
 	return &History{
-		Tags: map[string]*TagHistory{},
-		path: path,
+		Homes: make(map[string]*HomeHistory),
+		path:  path,
 	}
 }
 
@@ -44,8 +44,13 @@ func Parse(path string) (*History, error) {
 	return h, nil
 }
 
-func (h *History) Contains(tag, uri string) bool {
-	tagHist, ok := h.Tags[tag]
+func (h *History) Contains(id, tag, uri string) bool {
+	home, ok := h.Homes[id]
+	if !ok {
+		return false
+	}
+
+	tagHist, ok := home.Tags[tag]
 	if !ok {
 		return false
 	}
@@ -53,15 +58,22 @@ func (h *History) Contains(tag, uri string) bool {
 	return slices.Contains(tagHist.URIs, uri)
 }
 
-func (h *History) Add(tag, uri string) {
-	if h.Contains(tag, uri) {
+func (h *History) Add(id, tag, uri string) {
+	if h.Contains(id, tag, uri) {
 		return
 	}
 
-	if _, ok := h.Tags[tag]; !ok {
-		h.Tags[tag] = &TagHistory{}
+	if _, ok := h.Homes[id]; !ok {
+		h.Homes[id] = &HomeHistory{
+			Tags: make(map[string]*TagHistory),
+		}
 	}
-	tagHist := h.Tags[tag]
+	home := h.Homes[id]
+
+	if _, ok := home.Tags[tag]; !ok {
+		home.Tags[tag] = &TagHistory{}
+	}
+	tagHist := home.Tags[tag]
 	tagHist.URIs = append(tagHist.URIs, uri)
 }
 
@@ -83,11 +95,13 @@ func (h *History) Store() error {
 }
 
 func (h *History) Trim() {
-	for _, tagHist := range h.Tags {
-		length := len(tagHist.URIs)
-		if length <= Limit {
-			continue
+	for _, homeHist := range h.Homes {
+		for _, tagHist := range homeHist.Tags {
+			length := len(tagHist.URIs)
+			if length <= Limit {
+				continue
+			}
+			tagHist.URIs = tagHist.URIs[length-Limit : len(tagHist.URIs)]
 		}
-		tagHist.URIs = tagHist.URIs[length-Limit : len(tagHist.URIs)]
 	}
 }
